@@ -28,7 +28,8 @@ if (!MONGODB_URI) {
 // CORS configuration
 const allowedOrigins = [
   // "http://localhost:8080",
-  "https://real-estate-project-frontend-tu11.vercel.app",
+  // "http://localhost:8080",
+  "https://real-estate-project-frontend-2.vercel.app",
 ];
 
 app.use(
