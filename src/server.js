@@ -18,17 +18,16 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// CORS configuration
+// ✅ FIXED CORS configuration
 app.use(cors({
-   origin: [
-    // "http://localhost:8080",
+  origin: [
+    "https://plotchamps.in",
     "https://www.plotchamps.in",
-    "https://plotchamps.in"
+   
   ],
-  
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  allowedHeaders: ["Content-Type", "Authorization", "x-auth-token"]
 }));
 
 app.options('*', cors());
@@ -50,7 +49,7 @@ app.get("/", (req, res) => res.send("Backend server is running"));
 // ✅ CORRECTED ROUTE PATHS
 app.use("/api/auth", authRoutes);
 app.use("/api/listings", listingRoutes);
-app.use("/api/payments", paymentRoutes); // ✅ Changed from '/api/payment' to '/api/payments'
+app.use("/api/payments", paymentRoutes);
 app.use('/api/packages', packageRoutes);
 
 // 404 handler for API routes
