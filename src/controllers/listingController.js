@@ -42,18 +42,25 @@ export const createListing = async (req, res, next) => {
 export const getListings = async (req, res, next) => {
   try {
     let query = {};
-    
+
+    // ✅ Debug: Log request headers and user info
+    console.log("📥 Incoming Request Headers:", {
+      'x-current-role': req.headers['x-current-role'],
+      'authorization': req.headers['authorization'] ? 'Present' : 'Missing'
+    });
+    console.log("👤 Request User:", req.user);
+
     // ✅ CRITICAL FIX: Check header first, then token role
     const headerRole = req.headers['x-current-role'];
     const tokenRole = req.user?.role;
-    
+
     console.log("🔍 GetListings - Header Role:", headerRole, "Token Role:", tokenRole, "User ID:", req.user?.userId);
-    
+
     // ✅ USE HEADER ROLE ONLY - This is the current selected role
     const currentRole = headerRole || 'buyer'; // Default to buyer if no header
-    
+
     console.log("🎯 Current role for filtering:", currentRole);
-    
+
     // ✅ FIX: Only filter if current role is seller AND user is authenticated
     if (currentRole === 'seller' && req.user && req.user.userId) {
       query = { userRef: req.user.userId };

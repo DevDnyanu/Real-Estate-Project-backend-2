@@ -11,25 +11,39 @@ const PACKAGE_CONFIG = {
 
 /**
  * Get user's current active package
+ * ✅ FIXED: Packages are now user-wide, not role-specific
  */
 export const getUserPackage = async (req, res) => {
   try {
-    console.log('Fetching package for user:', req.user.userId);
-    
+    const { userType } = req.query;
+    console.log('Fetching package for user:', req.user.userId, 'userType:', userType);
+
+    // Get active package for user (regardless of userType)
     const userPackage = await UserPackage.getActivePackage(req.user.userId);
 
     if (!userPackage) {
       console.log('No active package found for user:', req.user.userId);
-      return res.json({ 
-        success: true, 
+      return res.json({
+        success: true,
         package: null,
         message: 'No active package found'
       });
     }
 
+    // ✅ REMOVED: No longer filter by userType - packages work across all roles
+
     const now = new Date();
     const expiryDate = new Date(userPackage.expiryDate);
     const daysRemaining = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const isValid = userPackage.isValid();
+    const remaining = userPackage.propertyLimit - userPackage.propertiesUsed;
+
+    // ✅ NEW: Calculate warning flags
+    const usagePercentage = (userPackage.propertiesUsed / userPackage.propertyLimit) * 100;
+    const nearExpiry = daysRemaining > 0 && daysRemaining <= 7; // 7 days warning
+    const limitNearReached = usagePercentage >= 90; // 90% usage warning
+    const expired = daysRemaining <= 0 || !isValid;
+    const limitReached = remaining <= 0;
 
     const packageData = {
       _id: userPackage._id,
@@ -39,13 +53,23 @@ export const getUserPackage = async (req, res) => {
       expiryDate: userPackage.expiryDate,
       propertyLimit: userPackage.propertyLimit,
       propertiesUsed: userPackage.propertiesUsed,
-      isActive: userPackage.isValid(),
+      isActive: isValid,
       daysRemaining: daysRemaining > 0 ? daysRemaining : 0,
       amount: userPackage.amount,
-      remaining: userPackage.propertyLimit - userPackage.propertiesUsed
+      remaining,
+      // ✅ NEW: Warning flags
+      warnings: {
+        nearExpiry,
+        limitNearReached,
+        expired,
+        limitReached
+      }
     };
 
-    console.log('Package found:', packageData);
+    console.log('Package found:', {
+      ...packageData,
+      warnings: packageData.warnings
+    });
 
     res.json({
       success: true,

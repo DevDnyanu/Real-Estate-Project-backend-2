@@ -13,21 +13,19 @@ import authRoutes from "./routes/auth.js";
 import { listingRoutes } from "./routes/listing.js";
 import paymentRoutes from "./routes/payment.js";
 import packageRoutes from './routes/package.js';
+import contactRoutes from './routes/contact.js';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ✅ FIXED CORS configuration
+// CORS configuration
 app.use(cors({
-  origin: [
-    "https://plotchamps.in",
-    "https://www.plotchamps.in",
-   
-  ],
+  origin: "http://localhost:8080",
+
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "x-auth-token"]
+  allowedHeaders: ["Content-Type", "Authorization", "x-current-role"]
 }));
 
 app.options('*', cors());
@@ -49,8 +47,9 @@ app.get("/", (req, res) => res.send("Backend server is running"));
 // ✅ CORRECTED ROUTE PATHS
 app.use("/api/auth", authRoutes);
 app.use("/api/listings", listingRoutes);
-app.use("/api/payments", paymentRoutes);
+app.use("/api/payments", paymentRoutes); // ✅ Changed from '/api/payment' to '/api/payments'
 app.use('/api/packages', packageRoutes);
+app.use('/api/contact', contactRoutes);
 
 // 404 handler for API routes
 app.use("/api/*", (req, res) => {
