@@ -1,4 +1,4 @@
-
+// src/server.js
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -18,7 +18,7 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// CORS configuration for deployment
+// ✅ UPDATED CORS configuration
 app.use(cors({
   origin: [
     "https://plotchamps.in",
@@ -26,10 +26,16 @@ app.use(cors({
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  allowedHeaders: [
+    "Content-Type", 
+    "Authorization", 
+    "x-current-role",      // ✅ Custom header allow
+    "X-Current-Role",      // ✅ Case sensitive
+    "X-Requested-With"     // ✅ Additional common header
+  ]
 }));
 
-app.options('*', cors());
+app.options('*', cors()); // ✅ Pre-flight requests handle
 
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI;
