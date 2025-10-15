@@ -29,9 +29,9 @@ app.use(cors({
   allowedHeaders: [
     "Content-Type", 
     "Authorization", 
-    "x-current-role",      // ✅ Custom header allow
-    "X-Current-Role",      // ✅ Case sensitive
-    "X-Requested-With"     // ✅ Additional common header
+    "x-current-role",
+    "X-Current-Role",
+    "X-Requested-With"
   ]
 }));
 
@@ -51,11 +51,25 @@ app.use(cookieParser());
 
 app.get("/", (req, res) => res.send("Backend server is running"));
 
+// ✅ ADD THIS AFTER API ROUTES (line 45 ke baad)
+
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/listings", listingRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use('/api/packages', packageRoutes);
+
+// ✅ Serve Static Frontend Files (React build)
+app.use(express.static(path.join(__dirname, '../client/dist')));
+
+
+// ✅ ADD THIS BEFORE 404 HANDLER
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api/')) {
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  }
+});
+
 
 // 404 handler for API routes
 app.use("/api/*", (req, res) => {
