@@ -1,4 +1,4 @@
-// src/server.js
+
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -13,19 +13,20 @@ import authRoutes from "./routes/auth.js";
 import { listingRoutes } from "./routes/listing.js";
 import paymentRoutes from "./routes/payment.js";
 import packageRoutes from './routes/package.js';
-import contactRoutes from './routes/contact.js';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// CORS configuration
+// CORS configuration for deployment
 app.use(cors({
-  origin: "http://localhost:8080",
-
+  origin: [
+    "https://plotchamps.in",
+    "https://www.plotchamps.in"
+  ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "x-current-role"]
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
 app.options('*', cors());
@@ -44,12 +45,11 @@ app.use(cookieParser());
 
 app.get("/", (req, res) => res.send("Backend server is running"));
 
-// ✅ CORRECTED ROUTE PATHS
+// API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/listings", listingRoutes);
-app.use("/api/payments", paymentRoutes); // ✅ Changed from '/api/payment' to '/api/payments'
+app.use("/api/payments", paymentRoutes);
 app.use('/api/packages', packageRoutes);
-app.use('/api/contact', contactRoutes);
 
 // 404 handler for API routes
 app.use("/api/*", (req, res) => {
