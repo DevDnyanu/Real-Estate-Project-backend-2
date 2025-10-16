@@ -21,9 +21,9 @@ const __dirname = path.dirname(__filename);
 // CORS configuration for deployment
 app.use(cors({
   origin: [
-    "http://localhost:8080",
-    // "https://plotchamps.in",
-    // "https://www.plotchamps.in"
+    // "http://localhost:8080",
+    "https://plotchamps.in",
+    "https://www.plotchamps.in"
   ],
    credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
