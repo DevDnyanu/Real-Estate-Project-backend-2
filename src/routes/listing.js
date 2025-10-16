@@ -1,4 +1,4 @@
-// routes/listing.js
+// routes/listing.js - CORRECTED VERSION
 import express from "express";
 import multer from "multer";
 import {
@@ -14,7 +14,7 @@ import {
   getImage,
   getVideo,
 } from "../controllers/listingController.js";
-import authenticateToken from "../Middlewares/auth.js";
+import { verifyToken as authMiddleware } from "../Middlewares/auth.js"; // ✅ NAMED IMPORT
 
 const router = express.Router();
 
@@ -37,7 +37,8 @@ const uploadVideos = multer({
   limits: { fileSize: 50 * 1024 * 1024, files: 3 },
 });
 
-router.use(authenticateToken);
+// ✅ Use authMiddleware instead of authenticateToken
+router.use(authMiddleware);
 
 // CRUD routes
 router.post("/", createListing);

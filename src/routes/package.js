@@ -1,5 +1,4 @@
 import express from 'express';
-import auth from '../Middlewares/auth.js';
 import {
   getUserPackage,
   activateFreePackage,
@@ -8,22 +7,23 @@ import {
   canPerformAction,
   getAvailablePackages
 } from '../controllers/packageController.js';
-
-import { 
-  createOrder, 
-  verifyPayment 
-} from '../controllers/paymentController.js';
+import { verifyToken as authMiddleware } from '../Middlewares/auth.js';
 
 const router = express.Router();
 
-router.get('/user-package', auth, getUserPackage);
-router.post('/activate-free', auth, activateFreePackage);
-router.post('/update-usage', auth, updatePackageUsage);  // ✅ rename here
-router.get('/history', auth, getPackageHistory);
-router.get('/can-perform', auth, canPerformAction);
-router.get('/available', auth, getAvailablePackages);
+// Apply authentication middleware to all routes
+router.use(authMiddleware);
 
-router.post('/create-order', auth, createOrder);
-router.post('/verify-payment', auth, verifyPayment);
+// Package information routes
+router.get('/user-package', getUserPackage);
+router.get('/available', getAvailablePackages);
+router.get('/history', getPackageHistory);
+router.get('/can-perform', canPerformAction);
+
+// Package activation routes (only free)
+router.post('/activate-free', activateFreePackage);
+
+// Package usage management
+router.post('/update-usage', updatePackageUsage);
 
 export default router;

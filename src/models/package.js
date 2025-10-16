@@ -50,7 +50,7 @@ const userPackageSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "completed", "failed", "expired"],
+      enum: ["pending", "completed", "failed", "expired", "replaced"],
       default: "pending",
     },
     isActive: {
@@ -84,6 +84,11 @@ userPackageSchema.methods.isValid = function() {
          this.status === "completed" && 
          now <= this.expiryDate && 
          this.propertiesUsed < this.propertyLimit;
+};
+
+// Method to get remaining properties
+userPackageSchema.methods.getRemaining = function() {
+  return Math.max(0, this.propertyLimit - this.propertiesUsed);
 };
 
 export default mongoose.model("UserPackage", userPackageSchema);

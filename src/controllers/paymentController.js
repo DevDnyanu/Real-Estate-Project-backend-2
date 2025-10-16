@@ -7,9 +7,10 @@ import UserPackage from "../models/package.js";
 import Payment from "../models/payment.js";
 
 const PACKAGE_CONFIG = {
-  silver: { price: 499, duration: 30, limit: 30 },
-  gold: { price: 999, duration: 90, limit: 50 },
-  premium: { price: 1999, duration: 365, limit: 100 }
+  free: { limit: 5, duration: 15, price: 0 },
+  silver: { limit: 30, duration: 30, price: 499 },
+  gold: { limit: 50, duration: 90, price: 999 },
+  premium: { limit: 100, duration: 365, price: 1999 }
 };
 
 // Razorpay initialization
@@ -21,9 +22,18 @@ if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
   });
 }
 
+/**
+ * Create payment order
+ */
 export const createOrder = async (req, res) => {
   try {
     const { packageType, userType = "buyer" } = req.body;
+
+    console.log("💳 Creating payment order:", {
+      packageType,
+      userType,
+      userId: req.user.userId
+    });
 
     if (!packageType) {
       return res.status(400).json({
@@ -55,13 +65,15 @@ export const createOrder = async (req, res) => {
     const options = {
       amount: amount * 100,
       currency: "INR",
-      receipt: receipt, // ✅ Now it's only ~20 characters
+      receipt: receipt,
       payment_capture: 1,
     };
 
-    console.log("Creating Razorpay order with:", options);
+    console.log("📦 Creating Razorpay order with:", options);
 
     const order = await razorpay.orders.create(options);
+
+    console.log('✅ Razorpay order created:', order.id);
 
     res.json({
       success: true,
@@ -82,7 +94,7 @@ export const createOrder = async (req, res) => {
       key_id: process.env.RAZORPAY_KEY_ID,
     });
   } catch (err) {
-    console.error("Order creation error:", err);
+    console.error("❌ Order creation error:", err);
     res.status(500).json({
       success: false,
       message: err.message || "Server error while creating order",
@@ -90,6 +102,9 @@ export const createOrder = async (req, res) => {
   }
 };
 
+/**
+ * Verify payment and activate package
+ */
 export const verifyPayment = async (req, res) => {
   try {
     const {
@@ -99,6 +114,14 @@ export const verifyPayment = async (req, res) => {
       packageType,
       userType = "buyer",
     } = req.body;
+
+    console.log('🔐 Verifying payment:', {
+      razorpay_payment_id,
+      razorpay_order_id,
+      packageType,
+      userType,
+      userId: req.user.userId
+    });
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !packageType) {
       return res.status(400).json({
@@ -115,33 +138,62 @@ export const verifyPayment = async (req, res) => {
       });
     }
 
+    // ✅ Verify signature
     const generatedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
 
+    console.log('🔐 Signature verification:', {
+      received: razorpay_signature,
+      expected: generatedSignature,
+      match: generatedSignature === razorpay_signature
+    });
+
     if (generatedSignature !== razorpay_signature) {
       return res.status(400).json({
         success: false,
-        message: "Payment verification failed",
+        message: "Payment verification failed - invalid signature",
       });
     }
 
+    // ✅ Check if payment already processed
     const existingPayment = await Payment.findOne({
       razorpayPaymentId: razorpay_payment_id,
     });
 
     if (existingPayment) {
+      console.log('⚠️ Payment already processed');
       return res.status(400).json({
         success: false,
         message: "Payment already processed",
       });
     }
 
+    // ✅ Verify payment with Razorpay API
+    try {
+      const payment = await razorpay.payments.fetch(razorpay_payment_id);
+      
+      console.log('💰 Payment status from Razorpay:', payment.status);
+      
+      if (payment.status !== 'captured') {
+        return res.status(400).json({
+          success: false,
+          message: `Payment not captured. Status: ${payment.status}`
+        });
+      }
+    } catch (razorpayError) {
+      console.error('❌ Razorpay payment verification failed:', razorpayError);
+      return res.status(400).json({
+        success: false,
+        message: 'Payment verification with Razorpay failed'
+      });
+    }
+
+    // ✅ STEP 1: Deactivate any existing packages
     await UserPackage.updateMany(
       { 
         userId: req.user.userId, 
-        userType: userType,
         isActive: true 
       },
       { 
@@ -154,6 +206,7 @@ export const verifyPayment = async (req, res) => {
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + PACKAGE_CONFIG[packageType].duration);
 
+    // ✅ STEP 2: Create new package in UserPackage collection
     const newUserPackage = new UserPackage({
       userId: req.user.userId,
       packageType,
@@ -172,6 +225,7 @@ export const verifyPayment = async (req, res) => {
 
     await newUserPackage.save();
 
+    // ✅ STEP 3: Create payment record in Payment collection
     const payment = new Payment({
       userId: req.user.userId,
       packageType,
@@ -188,6 +242,14 @@ export const verifyPayment = async (req, res) => {
     await payment.save();
 
     const daysRemaining = Math.ceil((expiryDate.getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    console.log('✅ Payment verified and package activated:', {
+      packageId: newUserPackage._id,
+      paymentId: payment._id,
+      packageType: newUserPackage.packageType,
+      paymentId: razorpay_payment_id,
+      amount: PACKAGE_CONFIG[packageType].price
+    });
 
     res.json({
       success: true,
@@ -213,7 +275,7 @@ export const verifyPayment = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error("Payment verification error:", err);
+    console.error("❌ Payment verification error:", err);
     res.status(500).json({
       success: false,
       message: "Server error during payment verification",
@@ -221,6 +283,9 @@ export const verifyPayment = async (req, res) => {
   }
 };
 
+/**
+ * Get payment history
+ */
 export const getPaymentHistory = async (req, res) => {
   try {
     const payments = await Payment.find({ userId: req.user.userId })
@@ -247,7 +312,7 @@ export const getPaymentHistory = async (req, res) => {
       total: payments.length,
     });
   } catch (err) {
-    console.error("Payment history error:", err);
+    console.error("❌ Payment history error:", err);
     res.status(500).json({
       success: false,
       message: "Error fetching payment history",

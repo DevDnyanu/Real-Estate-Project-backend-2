@@ -1,3 +1,4 @@
+
 // controllers/listingController.js
 import Listing from "../models/Listing.js";
 import mongoose from "mongoose";
@@ -39,82 +40,52 @@ export const createListing = async (req, res, next) => {
 };
 
 /** Get all listings */
+/** Get all listings */
+// controllers/listingController.js - getListings function ko replace karein
+
+/** Get all listings */
 export const getListings = async (req, res, next) => {
   try {
     let query = {};
-
-    // ✅ Debug: Log request headers and user info
-    console.log("📥 Incoming Request Headers:", {
-      'x-current-role': req.headers['x-current-role'],
-      'authorization': req.headers['authorization'] ? 'Present' : 'Missing'
-    });
-    console.log("👤 Request User:", req.user);
-
-    // ✅ CRITICAL FIX: Check header first, then token role
+    
+    console.log("🔍 GetListings - Role Debug:");
+    console.log("📋 Header Role:", req.headers['x-current-role']);
+    console.log("🔐 Token Role:", req.user?.role);
+    console.log("👤 User ID:", req.user?.userId);
+    
+    // ✅ REAL WORLD FIX: Use token role for security, header role for UI context
+    const tokenRole = req.user?.role || 'buyer';
     const headerRole = req.headers['x-current-role'];
-    const tokenRole = req.user?.role;
-
-    console.log("🔍 GetListings - Header Role:", headerRole, "Token Role:", tokenRole, "User ID:", req.user?.userId);
-
-    // ✅ USE HEADER ROLE ONLY - This is the current selected role
-    const currentRole = headerRole || 'buyer'; // Default to buyer if no header
-
-    console.log("🎯 Current role for filtering:", currentRole);
-
-    // ✅ FIX: Only filter if current role is seller AND user is authenticated
-    if (currentRole === 'seller' && req.user && req.user.userId) {
+    
+    // For filtering, use token role (secure) but log header role for debugging
+    console.log("🎯 Token Role for filtering:", tokenRole);
+    console.log("📋 Header Role for UI context:", headerRole);
+    
+    if (tokenRole === 'seller' && req.user?.userId) {
       query = { userRef: req.user.userId };
-      console.log("👨‍💼 Showing seller's listings only - User ID:", req.user.userId);
+      console.log("👨‍💼 Showing seller's listings - User ID:", req.user.userId);
     } else {
-      console.log("👨‍💻 Showing ALL listings - Role:", currentRole, "Authenticated:", !!req.user);
-      // ✅ NO FILTER for buyers - show all listings
-      query = {}; // Explicitly show all listings
+      console.log("👨‍💻 Showing ALL listings - Role:", tokenRole);
+      query = {};
     }
     
-    const listings = await Listing.find(query).sort({ createdAt: -1 });
+    let listings = await Listing.find(query)
+      .populate('userRef', 'name email phone')
+      .sort({ createdAt: -1 });
+
     console.log("📊 Total listings found:", listings.length);
-
-    // Add image and video URLs with safe handling
-    const listingsWithMedia = listings.map(listing => {
-      const listingObj = listing.toObject();
-      
-      const images = Array.isArray(listingObj.images) ? listingObj.images : [];
-      const videos = Array.isArray(listingObj.videos) ? listingObj.videos : [];
-      
-      const imageUrls = images.map(imgId => {
-        if (typeof imgId === 'string' && imgId.startsWith('http')) {
-          return imgId;
-        }
-        return `${req.protocol}://${req.get("host")}/api/listings/image/${imgId}`;
-      });
-      
-      const videoUrls = videos.map(vidId => {
-        if (typeof vidId === 'string' && vidId.startsWith('http')) {
-          return vidId;
-        }
-        return `${req.protocol}://${req.get("host")}/api/listings/video/${vidId}`;
-      });
-      
-      return {
-        ...listingObj,
-        images: imageUrls,
-        videos: videoUrls
-      };
-    });
-
-    return res.json({
+    
+    res.status(200).json({
       success: true,
-      message: "Listings retrieved successfully",
-      listings: listingsWithMedia,
-      userRole: currentRole,
-      filteredFor: (currentRole === 'seller' && req.user?.userId) ? 'seller' : 'all',
-      totalCount: listingsWithMedia.length
+      listings: listings,
+      count: listings.length
     });
+
   } catch (err) {
+    console.error("Error in getListings:", err);
     next(err);
   }
 };
-
 
 
 /** Get single listing */

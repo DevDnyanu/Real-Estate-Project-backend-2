@@ -566,3 +566,80 @@ export const resetPassword = async (req, res) => {
     });
   }
 };
+
+
+
+/** Switch User Role */
+export const switchRole = async (req, res) => {
+  try {
+    const { newRole } = req.body;
+    const user = req.user;
+
+    console.log(`🔄 Role switch request: ${user.role} → ${newRole} for user: ${user.userId}`);
+
+    // Validate role
+    if (!['buyer', 'seller'].includes(newRole)) {
+      return res.status(400).json({
+        status: 'error',
+        message: "Invalid role. Role must be 'buyer' or 'seller'"
+      });
+    }
+
+    // Check if user exists in database
+    const userData = await User.findById(user.userId);
+    if (!userData) {
+      return res.status(404).json({
+        status: 'error',
+        message: "User not found"
+      });
+    }
+
+    // Check if user can use this role
+    if (!userData.canUseRole(newRole)) {
+      return res.status(403).json({
+        status: 'error',
+        message: `You don't have permission to switch to ${newRole} role`
+      });
+    }
+
+    // Generate new token with updated role
+    const newToken = jwt.sign(
+      {
+        userId: user.userId,
+        role: newRole, // ✅ NEW ROLE IN TOKEN
+        name: userData.name,
+        email: userData.email
+      },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '7d' }
+    );
+
+    console.log(`✅ Role switched successfully: ${user.role} → ${newRole}`);
+
+    res.json({
+      status: 'success',
+      message: `Role switched to ${newRole} successfully`,
+      token: newToken,
+      data: {
+        user: {
+          id: userData._id,
+          name: userData.name,
+          email: userData.email,
+          phone: userData.phone,
+          role: newRole, // ✅ UPDATED ROLE
+          originalRole: userData.role,
+          availableRoles: userData.availableRoles,
+          canSwitchRole: true,
+          image: userData.profilePicture
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("Role switch error:", error);
+    res.status(500).json({
+      status: 'error',
+      message: "Failed to switch role: " + error.message
+    });
+  }
+};

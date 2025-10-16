@@ -1,3 +1,4 @@
+// routes/auth.js - CORRECTED VERSION
 import express from 'express';
 import { 
   signup, 
@@ -9,9 +10,10 @@ import {
   getProfile,
   updateProfile,
   uploadProfileImage,
-  removeProfileImage
+  removeProfileImage,
+  switchRole
 } from '../controllers/authController.js';
-import authMiddleware from '../Middlewares/auth.js';
+import { verifyToken as authMiddleware } from '../Middlewares/auth.js'; // ✅ CORRECT IMPORT
 
 const router = express.Router();
 
@@ -23,10 +25,13 @@ router.post('/verify-otp', verifyOtp);
 router.post('/reset-password', resetPassword);
 
 // Protected routes
-router.get('/verify', verifyToken);
-router.get('/profile', authMiddleware, getProfile);
+router.get('/verify', verifyToken); // ✅ This is from authController
+router.get('/profile', authMiddleware, getProfile); // ✅ This is from auth middleware
 router.put('/profile', authMiddleware, updateProfile);
-router.post('/profile/upload-image', authMiddleware, uploadProfileImage); // No multer
+router.post('/profile/upload-image', authMiddleware, uploadProfileImage);
 router.delete('/profile/remove-image', authMiddleware, removeProfileImage);
+
+// Role switch route
+router.post('/switch-role', authMiddleware, switchRole);
 
 export default router;

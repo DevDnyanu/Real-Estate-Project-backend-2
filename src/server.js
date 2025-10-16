@@ -1,4 +1,4 @@
-// src/server.js
+
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -18,24 +18,26 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ✅ UPDATED CORS configuration
+// CORS configuration for deployment
 app.use(cors({
   origin: [
-    "https://plotchamps.in",
-    "https://www.plotchamps.in"
+    "http://localhost:8080",
+    // "https://plotchamps.in",
+    // "https://www.plotchamps.in"
   ],
-  credentials: true,
+   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: [
     "Content-Type", 
     "Authorization", 
     "x-current-role",
     "X-Current-Role",
+    'x-user-role', 
     "X-Requested-With"
   ]
 }));
 
-app.options('*', cors()); // ✅ Pre-flight requests handle
+app.options('*', cors());
 
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -51,25 +53,11 @@ app.use(cookieParser());
 
 app.get("/", (req, res) => res.send("Backend server is running"));
 
-// ✅ ADD THIS AFTER API ROUTES (line 45 ke baad)
-
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/listings", listingRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use('/api/packages', packageRoutes);
-
-// ✅ Serve Static Frontend Files (React build)
-app.use(express.static(path.join(__dirname, '../client/dist')));
-
-
-// ✅ ADD THIS BEFORE 404 HANDLER
-app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api/')) {
-    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
-  }
-});
-
 
 // 404 handler for API routes
 app.use("/api/*", (req, res) => {
