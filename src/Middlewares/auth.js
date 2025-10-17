@@ -1,4 +1,4 @@
-// Middlewares/auth.js - FINAL VERSION (Named Exports)
+// Middlewares/auth.js
 import jwt from 'jsonwebtoken';
 
 export const verifyToken = async (req, res, next) => {
@@ -22,19 +22,16 @@ export const verifyToken = async (req, res, next) => {
       name: decoded.name
     });
 
-    if (headerRole && headerRole !== decoded.role) {
-      console.warn('⚠️ Role mismatch detected:', {
-        tokenRole: decoded.role,
-        headerRole: headerRole,
-        userId: decoded.userId
-      });
-    }
+    // ✅ Use header role if provided, otherwise use token role
+    const effectiveRole = headerRole || decoded.role;
 
     req.user = {
       userId: decoded.userId,
-      role: decoded.role,
+      role: effectiveRole, // ✅ Effective role for this request
       name: decoded.name,
-      email: decoded.email
+      email: decoded.email,
+      tokenRole: decoded.role, // Original token role
+      headerRole: headerRole // Header role from frontend
     };
 
     next();

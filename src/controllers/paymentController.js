@@ -23,15 +23,14 @@ if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
 }
 
 /**
- * Create payment order
+ * Create payment order - UPDATED: userType removed
  */
 export const createOrder = async (req, res) => {
   try {
-    const { packageType, userType = "buyer" } = req.body;
+    const { packageType } = req.body; // ✅ REMOVED: userType
 
     console.log("💳 Creating payment order:", {
       packageType,
-      userType,
       userId: req.user.userId
     });
 
@@ -86,7 +85,6 @@ export const createOrder = async (req, res) => {
       },
       packageDetails: {
         packageType,
-        userType,
         amount,
         duration: PACKAGE_CONFIG[packageType].duration,
         propertyLimit: PACKAGE_CONFIG[packageType].limit,
@@ -103,7 +101,7 @@ export const createOrder = async (req, res) => {
 };
 
 /**
- * Verify payment and activate package
+ * Verify payment and activate package - UPDATED: userType removed
  */
 export const verifyPayment = async (req, res) => {
   try {
@@ -112,14 +110,13 @@ export const verifyPayment = async (req, res) => {
       razorpay_payment_id,
       razorpay_signature,
       packageType,
-      userType = "buyer",
+      // ✅ REMOVED: userType parameter
     } = req.body;
 
     console.log('🔐 Verifying payment:', {
       razorpay_payment_id,
       razorpay_order_id,
       packageType,
-      userType,
       userId: req.user.userId
     });
 
@@ -206,11 +203,11 @@ export const verifyPayment = async (req, res) => {
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + PACKAGE_CONFIG[packageType].duration);
 
-    // ✅ STEP 2: Create new package in UserPackage collection
+    // ✅ STEP 2: Create new package in UserPackage collection WITHOUT userType
     const newUserPackage = new UserPackage({
       userId: req.user.userId,
       packageType,
-      userType,
+      // ✅ REMOVED: userType field
       amount: PACKAGE_CONFIG[packageType].price,
       propertyLimit: PACKAGE_CONFIG[packageType].limit,
       propertiesUsed: 0,
@@ -225,11 +222,11 @@ export const verifyPayment = async (req, res) => {
 
     await newUserPackage.save();
 
-    // ✅ STEP 3: Create payment record in Payment collection
+    // ✅ STEP 3: Create payment record in Payment collection WITHOUT userType
     const payment = new Payment({
       userId: req.user.userId,
       packageType,
-      userType,
+      // ✅ REMOVED: userType field
       amount: PACKAGE_CONFIG[packageType].price,
       currency: "INR",
       razorpayOrderId: razorpay_order_id,
@@ -253,11 +250,11 @@ export const verifyPayment = async (req, res) => {
 
     res.json({
       success: true,
-      message: "Payment verified! Package activated.",
+      message: "Payment verified! Package activated for all roles.",
       package: {
         _id: newUserPackage._id,
         packageType: newUserPackage.packageType,
-        userType: newUserPackage.userType,
+        // ✅ REMOVED: userType from response
         purchaseDate: newUserPackage.purchaseDate,
         expiryDate: newUserPackage.expiryDate,
         propertyLimit: newUserPackage.propertyLimit,
@@ -284,7 +281,7 @@ export const verifyPayment = async (req, res) => {
 };
 
 /**
- * Get payment history
+ * Get payment history - UPDATED: userType removed from response
  */
 export const getPaymentHistory = async (req, res) => {
   try {
@@ -296,7 +293,7 @@ export const getPaymentHistory = async (req, res) => {
     const paymentHistory = payments.map((p) => ({
       id: p._id,
       packageType: p.packageType,
-      userType: p.userType,
+      // ✅ REMOVED: userType from response
       amount: p.amount,
       currency: p.currency,
       status: p.status,

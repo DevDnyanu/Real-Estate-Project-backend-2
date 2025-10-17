@@ -1,6 +1,6 @@
+// controllers/packageController.js - UPDATED
 import UserPackage from '../models/package.js';
 
-// Package configuration
 const PACKAGE_CONFIG = {
   free: { limit: 5, duration: 15, price: 0 },
   silver: { limit: 30, duration: 30, price: 499 },
@@ -9,16 +9,28 @@ const PACKAGE_CONFIG = {
 };
 
 /**
- * Get user's current active package
+ * Get user's current active package - FIXED: Role-agnostic
  */
 export const getUserPackage = async (req, res) => {
   try {
-    console.log('🔍 Fetching package for user:', req.user.userId, 'Current role:', req.user.role);
+    const userId = req.user.userId;
+    const currentRole = req.user.role;
 
-    const userPackage = await UserPackage.getActivePackage(req.user.userId);
+    console.log('🔍 Fetching package for user:', { 
+      userId, 
+      currentRole 
+    });
+
+    // ✅ FIXED: Package is now role-agnostic
+    const userPackage = await UserPackage.findOne({
+      userId: userId,
+      isActive: true,
+      expiryDate: { $gt: new Date() },
+      status: "completed"
+    }).sort({ createdAt: -1 });
 
     if (!userPackage) {
-      console.log('❌ No active package found for user:', req.user.userId);
+      console.log('❌ No active package found for user:', userId);
       return res.json({
         success: true,
         package: null,
@@ -32,16 +44,10 @@ export const getUserPackage = async (req, res) => {
     const isValid = userPackage.isValid();
     const remaining = userPackage.getRemaining();
 
-    const usagePercentage = (userPackage.propertiesUsed / userPackage.propertyLimit) * 100;
-    const nearExpiry = daysRemaining > 0 && daysRemaining <= 7;
-    const limitNearReached = usagePercentage >= 90;
-    const expired = daysRemaining <= 0 || !isValid;
-    const limitReached = remaining <= 0;
-
     const packageData = {
       _id: userPackage._id,
       packageType: userPackage.packageType,
-      userType: userPackage.userType,
+      // ✅ REMOVED: userType field
       purchaseDate: userPackage.purchaseDate,
       expiryDate: userPackage.expiryDate,
       propertyLimit: userPackage.propertyLimit,
@@ -50,19 +56,14 @@ export const getUserPackage = async (req, res) => {
       daysRemaining: daysRemaining > 0 ? daysRemaining : 0,
       amount: userPackage.amount,
       remaining,
-      warnings: {
-        nearExpiry,
-        limitNearReached,
-        expired,
-        limitReached
-      }
+      currentRole: currentRole // For UI context only
     };
 
-    console.log('✅ Package found for current role:', {
+    console.log('✅ Package found:', {
       packageType: packageData.packageType,
-      currentRole: packageData.userType,
       remaining: packageData.remaining,
-      isValid: packageData.isActive
+      isValid: packageData.isActive,
+      currentRole: currentRole
     });
 
     res.json({
@@ -79,7 +80,7 @@ export const getUserPackage = async (req, res) => {
 };
 
 /**
- * Activate free package
+ * Activate free package - UPDATED
  */
 export const activateFreePackage = async (req, res) => {
   try {
@@ -105,6 +106,7 @@ export const activateFreePackage = async (req, res) => {
       });
     }
 
+    // ✅ Deactivate any existing packages
     await UserPackage.updateMany(
       { userId: req.user.userId, isActive: true },
       { isActive: false, status: 'expired' }
@@ -114,10 +116,10 @@ export const activateFreePackage = async (req, res) => {
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + PACKAGE_CONFIG[packageType].duration);
 
+    // ✅ Create new package WITHOUT userType
     const newUserPackage = new UserPackage({
       userId: req.user.userId,
       packageType,
-      userType: req.user.role,
       amount: PACKAGE_CONFIG[packageType].price,
       propertyLimit: PACKAGE_CONFIG[packageType].limit,
       propertiesUsed: 0,
@@ -142,7 +144,6 @@ export const activateFreePackage = async (req, res) => {
       package: {
         _id: newUserPackage._id,
         packageType: newUserPackage.packageType,
-        userType: newUserPackage.userType,
         purchaseDate: newUserPackage.purchaseDate,
         expiryDate: newUserPackage.expiryDate,
         propertyLimit: newUserPackage.propertyLimit,
@@ -162,6 +163,7 @@ export const activateFreePackage = async (req, res) => {
     });
   }
 };
+
 
 /**
  * Update package usage

@@ -1,3 +1,4 @@
+// models/package.js - UPDATED
 import mongoose from "mongoose";
 
 const userPackageSchema = new mongoose.Schema(
@@ -12,11 +13,7 @@ const userPackageSchema = new mongoose.Schema(
       enum: ["free", "silver", "gold", "premium"], 
       required: true 
     },
-    userType: {
-      type: String,
-      enum: ["buyer", "seller"],
-      required: true
-    },
+    // ✅ REMOVED: userType field - package is now role-agnostic
     amount: { 
       type: Number, 
       required: true,
@@ -66,7 +63,7 @@ userPackageSchema.index({ userId: 1, isActive: 1 });
 userPackageSchema.index({ expiryDate: 1 });
 userPackageSchema.index({ userId: 1, packageType: 1 });
 
-// Static method to get active package
+// Static method to get active package - UPDATED
 userPackageSchema.statics.getActivePackage = async function(userId) {
   const now = new Date();
   return this.findOne({ 

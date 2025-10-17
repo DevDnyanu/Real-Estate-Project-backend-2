@@ -12,11 +12,7 @@ const paymentSchema = new mongoose.Schema(
       enum: ["silver", "gold", "premium"], 
       required: true 
     },
-    userType: {
-      type: String,
-      enum: ["buyer", "seller"],
-      required: true
-    },
+    // ✅ REMOVED: userType field
     amount: { 
       type: Number, 
       required: true 
