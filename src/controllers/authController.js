@@ -12,6 +12,47 @@ const generateToken = (userId, name, email, role) => {
   );
 };
 
+// Background email sending function with retry logic
+const sendEmailInBackground = async (email, otp) => {
+  try {
+    console.log('🔄 Starting background email sending for:', email);
+    
+    let emailSent = false;
+    let attempts = 0;
+    const maxAttempts = 2;
+
+    // Try primary email service first
+    while (attempts < maxAttempts && !emailSent) {
+      attempts++;
+      try {
+        if (attempts === 1) {
+          emailSent = await sendOtpEmail(email, otp);
+        } else {
+          emailSent = await sendOtpEmailSimple(email, otp);
+        }
+        
+        if (emailSent) {
+          console.log('✅ Background email sent successfully to:', email);
+          break;
+        }
+      } catch (emailError) {
+        console.error(`❌ Email attempt ${attempts} failed:`, emailError.message);
+        if (attempts < maxAttempts) {
+          console.log('🔄 Retrying with alternative method...');
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+        }
+      }
+    }
+
+    if (!emailSent) {
+      console.error('❌ All email attempts failed for:', email);
+    }
+    
+  } catch (error) {
+    console.error('❌ Background email process failed:', error.message);
+  }
+};
+
 export const signup = async (req, res) => {
   try {
     const { error } = signupValidation(req.body);
@@ -376,6 +417,7 @@ export const removeProfileImage = async (req, res) => {
   }
 };
 
+// Enhanced Forgot Password with immediate response and better email handling
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -387,51 +429,55 @@ export const forgotPassword = async (req, res) => {
       });
     }
 
+    console.log('🔐 Forgot password request for:', email);
+
     const user = await User.findOne({ email });
-    if (!user) {
-      // Security: Don't reveal if email exists or not
-      return res.json({
-        status: 'success',
-        message: 'If the email exists, a password reset OTP has been sent'
-      });
-    }
-
-    const otp = user.generateResetOtp();
-    await user.save();
-
-    console.log('🔐 Generated OTP for', email, ':', otp);
-
-    // ✅ FIXED: ACTUALLY SEND THE EMAIL
-    const emailSent = await sendOtpEmailSimple(email, otp);
     
-    if (!emailSent) {
-      console.error('❌ Failed to send email for:', email);
-      // Still return success for security
-    } else {
-      console.log('✅ OTP email sent successfully to:', email);
-    }
-
-    const response = {
+    // Security: Always return success to prevent email enumeration
+    const successResponse = {
       status: 'success',
-      message: 'Password reset OTP has been sent to your email',
+      message: 'If the email exists, a password reset OTP has been sent to your email',
       data: {
         email: email
       }
     };
 
-    // Development में हमेशा OTP show करें
+    if (!user) {
+      console.log('❌ User not found for email:', email);
+      // Still return success for security
+      return res.json(successResponse);
+    }
+
+    // Generate OTP
+    const otp = user.generateResetOtp();
+    await user.save();
+
+    console.log('🔐 Generated OTP for', email, ':', otp);
+
+    // Add to response for development
     if (process.env.NODE_ENV === 'development') {
-      response.data.otp = otp;
+      successResponse.data.otp = otp;
       console.log('🔐 Development OTP (for testing):', otp);
     }
 
-    return res.json(response);
+    // ✅ CRITICAL: Send email in background without blocking response
+    sendEmailInBackground(email, otp).catch(error => {
+      console.error('❌ Background email failed:', error);
+    });
+
+    // Return immediate response - don't wait for email
+    return res.json(successResponse);
 
   } catch (error) {
-    console.error('Forgot password error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error: ' + error.message
+    console.error('❌ Forgot password error:', error);
+    
+    // Still return success for security even if there's an error
+    res.json({
+      status: 'success',
+      message: 'If the email exists, a password reset OTP has been sent to your email',
+      data: {
+        email: req.body.email
+      }
     });
   }
 };
@@ -472,12 +518,27 @@ export const verifyOtp = async (req, res) => {
     }
 
     if (user.resetPasswordOtp !== otp) {
+      // Track failed attempts for security
+      user.resetPasswordAttempts = (user.resetPasswordAttempts || 0) + 1;
+      await user.save();
+
+      if (user.resetPasswordAttempts >= 5) {
+        user.clearResetFields();
+        await user.save();
+        return res.status(400).json({
+          status: 'error',
+          message: 'Too many failed attempts. Please request a new OTP.'
+        });
+      }
+
       return res.status(400).json({
         status: 'error',
         message: 'Invalid OTP'
       });
     }
 
+    // Reset failed attempts on successful verification
+    user.resetPasswordAttempts = 0;
     const resetToken = user.generateResetToken();
     user.resetPasswordOtp = null;
     user.resetPasswordOtpExpiry = null;
@@ -556,7 +617,7 @@ export const resetPassword = async (req, res) => {
 
     res.json({
       status: 'success',
-      message: 'Password reset successfully'
+      message: 'Password reset successfully. You can now login with your new password.'
     });
   } catch (error) {
     console.error('Reset password error:', error);
@@ -566,8 +627,6 @@ export const resetPassword = async (req, res) => {
     });
   }
 };
-
-
 
 /** Switch User Role */
 export const switchRole = async (req, res) => {

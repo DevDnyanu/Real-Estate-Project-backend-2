@@ -1,110 +1,104 @@
-// utils/emailService.js
 import nodemailer from 'nodemailer';
 
-// Main OTP email function
+const getEmailConfig = () => {
+  console.log('🔧 Environment in emailConfig:', {
+    NODE_ENV: process.env.NODE_ENV,
+    EMAIL_USER_EXISTS: !!process.env.EMAIL_USER,
+    EMAIL_PASS_EXISTS: !!process.env.EMAIL_PASS,
+    EMAIL_PASSWORD_EXISTS: !!process.env.EMAIL_PASSWORD, // ✅ Check this too
+    ALL_KEYS: Object.keys(process.env).filter(key => key.includes('EMAIL'))
+  });
+  
+  // ✅ Use EMAIL_PASSWORD if EMAIL_PASS doesn't exist
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD; // ✅ FIX HERE
+  
+  if (!user || !pass) {
+    console.error('❌ Email credentials missing in environment variables');
+    console.log('🔧 Available EMAIL env vars:', {
+      EMAIL_USER: process.env.EMAIL_USER,
+      EMAIL_PASS: process.env.EMAIL_PASS,
+      EMAIL_PASSWORD: process.env.EMAIL_PASSWORD
+    });
+    throw new Error('EMAIL_USER or EMAIL_PASS not configured in environment');
+  }
+  
+  return { user, pass };
+};
+
 export const sendOtpEmail = async (email, otp) => {
   try {
     console.log('📧 Attempting to send OTP email to:', email);
     
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.error('❌ Email credentials missing');
-      return false;
-    }
+    const emailConfig = getEmailConfig();
+    console.log('✅ Email config loaded successfully:', {
+      user: emailConfig.user,
+      pass: emailConfig.pass ? '***' + emailConfig.pass.slice(-4) : 'Not Set'
+    });
 
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        user: emailConfig.user,
+        pass: emailConfig.pass,
       },
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 100
     });
 
+    // Verify connection
     await transporter.verify();
     console.log('✅ Email server connection verified');
 
     const mailOptions = {
-      from: `"Plot Listing" <${process.env.EMAIL_USER}>`,
+      from: `"PlotChamps" <${emailConfig.user}>`,
       to: email,
-      subject: 'Password Reset OTP - Plot Listing',
+      subject: 'Password Reset OTP - PlotChamps',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; color: white;">
-            <h1 style="margin: 0; font-size: 28px;">Plot Listing</h1>
-            <p style="margin: 10px 0 0 0; opacity: 0.9;">Password Reset OTP</p>
-          </div>
-          
-          <div style="padding: 30px 20px;">
-            <h2 style="color: #333; text-align: center;">Your Verification Code</h2>
-            <p style="color: #666; text-align: center;">
-              Use the following OTP to reset your password. This code is valid for 10 minutes.
-            </p>
-            
-            <div style="text-align: center; margin: 40px 0;">
-              <div style="display: inline-block; background: #f8f9fa; padding: 20px 40px; border: 2px dashed #667eea; border-radius: 10px;">
-                <div style="font-size: 36px; font-weight: bold; color: #667eea; letter-spacing: 8px;">
-                  ${otp}
-                </div>
-              </div>
-            </div>
-            
-            <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <p style="margin: 0; color: #856404;">
-                <strong>Note:</strong> If you didn't request this OTP, please ignore this email.
-              </p>
-            </div>
-          </div>
-          
-          <div style="text-align: center; padding: 20px; background: #f8f9fa;">
-            <p style="margin: 0; color: #6c757d; font-size: 12px;">
-              &copy; 2024 Plot Listing. All rights reserved.
-            </p>
-          </div>
+          <h2>Password Reset OTP</h2>
+          <p>Your OTP code is: <strong style="font-size: 24px; color: #2563eb;">${otp}</strong></p>
+          <p>This code will expire in 10 minutes.</p>
         </div>
       `,
+      text: `Your OTP code is: ${otp}. This code will expire in 10 minutes.`
     };
 
     const result = await transporter.sendMail(mailOptions);
-    console.log('✅ OTP Email sent successfully!');
+    console.log('✅ OTP Email sent successfully! Message ID:', result.messageId);
     return true;
+    
   } catch (error) {
-    console.error('❌ Error sending OTP email:', error);
-    return false;
+    console.error('❌ Error sending OTP email:', error.message);
+    throw error;
   }
 };
 
-// Simple version (backup)
 export const sendOtpEmailSimple = async (email, otp) => {
   try {
-    console.log('📧 Sending simple OTP email to:', email);
+    const emailConfig = getEmailConfig();
     
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        user: emailConfig.user,
+        pass: emailConfig.pass,
       },
     });
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: emailConfig.user,
       to: email,
-      subject: 'Password Reset OTP - Plot Listing',
-      text: `Your OTP code is: ${otp}. This code will expire in 10 minutes.`,
-      html: `
-        <div>
-          <h2>Password Reset OTP</h2>
-          <p>Your OTP code is: <strong style="font-size: 24px; color: #2563eb;">${otp}</strong></p>
-          <p>This code will expire in 10 minutes.</p>
-          <p>If you didn't request this, please ignore this email.</p>
-        </div>
-      `
+      subject: 'Password Reset OTP - PlotChamps',
+      text: `Your OTP code is: ${otp}. This code will expire in 10 minutes.`
     };
 
     await transporter.sendMail(mailOptions);
     console.log('✅ Simple OTP email sent successfully');
     return true;
   } catch (error) {
-    console.error('❌ Simple email error:', error);
-    return false;
+    console.error('❌ Simple email error:', error.message);
+    throw error;
   }
 };
