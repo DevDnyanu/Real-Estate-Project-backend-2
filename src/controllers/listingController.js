@@ -42,7 +42,45 @@ export const createListing = async (req, res, next) => {
 /** Get all listings */
 /** Get all listings */
 // controllers/listingController.js - getListings function ko replace karein
+// ✅ NEW: Get seller's own listings
+export const getMyListings = async (req, res, next) => {
+  try {
+    console.log("🔍 GetMyListings - Seller Debug:");
+    console.log("👤 User ID:", req.user?.userId);
+    console.log("🔐 User Role:", req.user?.role);
+    
+    if (!req.user?.userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
 
+    // Only allow sellers to access their own listings
+    if (req.user.role !== 'seller') {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Seller role required.",
+      });
+    }
+
+    const listings = await Listing.find({ userRef: req.user.userId })
+      .populate('userRef', 'name email phone')
+      .sort({ createdAt: -1 });
+
+    console.log("📊 Seller listings found:", listings.length);
+    
+    res.status(200).json({
+      success: true,
+      listings: listings,
+      count: listings.length
+    });
+
+  } catch (err) {
+    console.error("Error in getMyListings:", err);
+    next(err);
+  }
+};
 /** Get all listings */
 export const getListings = async (req, res, next) => {
   try {

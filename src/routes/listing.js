@@ -1,4 +1,3 @@
-// routes/listing.js - CORRECTED VERSION
 import express from "express";
 import multer from "multer";
 import {
@@ -13,12 +12,13 @@ import {
   deleteVideos,
   getImage,
   getVideo,
+  getMyListings, // ✅ NEW IMPORT
 } from "../controllers/listingController.js";
-import { verifyToken as authMiddleware } from "../Middlewares/auth.js"; // ✅ NAMED IMPORT
+import { verifyToken as authMiddleware } from "../Middlewares/auth.js";
 
 const router = express.Router();
 
-// Multer (in-memory storage, since GridFS handled in controller)
+// Multer configuration (same as before)
 const uploadImages = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
@@ -37,8 +37,11 @@ const uploadVideos = multer({
   limits: { fileSize: 50 * 1024 * 1024, files: 3 },
 });
 
-// ✅ Use authMiddleware instead of authenticateToken
+// ✅ Use authMiddleware for all routes
 router.use(authMiddleware);
+
+// ✅ NEW: Seller's own listings route
+router.get("/my-listings", getMyListings);
 
 // CRUD routes
 router.post("/", createListing);
@@ -47,7 +50,7 @@ router.get("/:id", getListing);
 router.put("/:id", updateListing);
 router.delete("/:id", deleteListing);
 
-// Image handling routes - FIXED THE ROUTE PATH
+// Image handling routes
 router.post("/:listingId/upload-images", uploadImages.array("images", 6), uploadImagesHandler);
 router.delete("/:listingId/images", deleteImages);
 
