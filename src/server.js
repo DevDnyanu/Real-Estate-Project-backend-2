@@ -1,22 +1,26 @@
 import dotenv from "dotenv";
-dotenv.config();
+import { fileURLToPath } from 'url';
+import path from 'path';
 
+// ✅ CRITICAL FIX: Load environment FIRST with correct path
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ✅ Load .env from current directory BEFORE any other imports
+dotenv.config({ path: path.join(__dirname, '.env') });
+
+// ✅ NOW IMPORT OTHER MODULES
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
-import path from 'path';
-import { fileURLToPath } from 'url';
 import fs from 'fs';
 
 import authRoutes from "./routes/auth.js";
 import { listingRoutes } from "./routes/listing.js";
 import paymentRoutes from "./routes/payment.js";
 import packageRoutes from './routes/package.js';
-
+import contactRoutes from "./routes/contact.js";
 const app = express();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // ✅ ENHANCED CORS for production
 app.use(cors({
@@ -51,7 +55,8 @@ app.get("/health", (req, res) => {
   res.json({ 
     status: "OK", 
     message: "Server is running",
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development' // ✅ Added environment info
   });
 });
 
@@ -62,6 +67,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/listings", listingRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use('/api/packages', packageRoutes);
+app.use("/api/contact", contactRoutes);
 
 // ✅ CLIENT-SIDE ROUTING - CRITICAL FIX FOR 404 ERROR
 app.get('*', (req, res) => {
@@ -98,13 +104,22 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI;
 
+// ✅ Add environment check before starting
+console.log('🔧 Server starting with:', {
+  NODE_ENV: process.env.NODE_ENV || 'not-set',
+  PORT: PORT
+});
+
 mongoose.connect(MONGODB_URI, { 
   useNewUrlParser: true, 
   useUnifiedTopology: true 
 })
   .then(() => {
     console.log("Connected to MongoDB");
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`); // ✅ Added
+    });
   })
   .catch((err) => {
     console.error("MongoDB Connection Error:", err.message);

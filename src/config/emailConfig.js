@@ -1,40 +1,40 @@
+// emailConfig.js - COMPLETELY UPDATED VERSION
 import nodemailer from 'nodemailer';
 
 const getEmailConfig = () => {
-  console.log('🔧 Environment in emailConfig:', {
+  // ✅ REMOVE ALL SPACES from password
+  const user = process.env.EMAIL_USER;
+  let pass = (process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD || '').replace(/\s/g, '');
+  
+  console.log('🔧 Enhanced Environment Check:', {
     NODE_ENV: process.env.NODE_ENV,
-    EMAIL_USER_EXISTS: !!process.env.EMAIL_USER,
-    EMAIL_PASS_EXISTS: !!process.env.EMAIL_PASS,
-    EMAIL_PASSWORD_EXISTS: !!process.env.EMAIL_PASSWORD, // ✅ Check this too
-    ALL_KEYS: Object.keys(process.env).filter(key => key.includes('EMAIL'))
+    EMAIL_USER: user,
+    EMAIL_PASS_LENGTH: pass.length,
+    ALL_EMAIL_KEYS: Object.keys(process.env).filter(key => key.includes('EMAIL'))
   });
   
-  // ✅ Use EMAIL_PASSWORD if EMAIL_PASS doesn't exist
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD; // ✅ FIX HERE
-  
   if (!user || !pass) {
-    console.error('❌ Email credentials missing in environment variables');
-    console.log('🔧 Available EMAIL env vars:', {
-      EMAIL_USER: process.env.EMAIL_USER,
-      EMAIL_PASS: process.env.EMAIL_PASS,
-      EMAIL_PASSWORD: process.env.EMAIL_PASSWORD
+    console.error('❌ Email credentials MISSING:', {
+      EMAIL_USER: user,
+      EMAIL_PASS: pass ? '***' : 'Not Set'
     });
-    throw new Error('EMAIL_USER or EMAIL_PASS not configured in environment');
+    throw new Error('EMAIL_USER or EMAIL_PASS not configured properly');
   }
+  
+  console.log('✅ Final Email Config:', {
+    user: user,
+    pass: '***' + pass.slice(-4),
+    passLength: pass.length
+  });
   
   return { user, pass };
 };
 
 export const sendOtpEmail = async (email, otp) => {
   try {
-    console.log('📧 Attempting to send OTP email to:', email);
+    console.log('📧 Sending OTP to:', email);
     
     const emailConfig = getEmailConfig();
-    console.log('✅ Email config loaded successfully:', {
-      user: emailConfig.user,
-      pass: emailConfig.pass ? '***' + emailConfig.pass.slice(-4) : 'Not Set'
-    });
 
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -42,14 +42,18 @@ export const sendOtpEmail = async (email, otp) => {
         user: emailConfig.user,
         pass: emailConfig.pass,
       },
+      // ✅ Better configuration
       pool: true,
-      maxConnections: 5,
-      maxMessages: 100
+      maxConnections: 3,
+      secure: true,
+      tls: {
+        rejectUnauthorized: false
+      }
     });
 
-    // Verify connection
+    console.log('🔐 Attempting SMTP connection...');
     await transporter.verify();
-    console.log('✅ Email server connection verified');
+    console.log('✅ SMTP Connection Verified');
 
     const mailOptions = {
       from: `"PlotChamps" <${emailConfig.user}>`,
@@ -60,21 +64,31 @@ export const sendOtpEmail = async (email, otp) => {
           <h2>Password Reset OTP</h2>
           <p>Your OTP code is: <strong style="font-size: 24px; color: #2563eb;">${otp}</strong></p>
           <p>This code will expire in 10 minutes.</p>
+          <p><strong>Note:</strong> If you didn't request this, please ignore this email.</p>
         </div>
       `,
       text: `Your OTP code is: ${otp}. This code will expire in 10 minutes.`
     };
 
+    console.log('📤 Sending email...');
     const result = await transporter.sendMail(mailOptions);
-    console.log('✅ OTP Email sent successfully! Message ID:', result.messageId);
+    console.log('✅ OTP Email SENT! Message ID:', result.messageId);
+    console.log('✅ Response:', result.response);
+    
     return true;
     
   } catch (error) {
-    console.error('❌ Error sending OTP email:', error.message);
+    console.error('❌ Email Error Details:', {
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      stack: error.stack
+    });
     throw error;
   }
 };
 
+// Keep the simple version as backup
 export const sendOtpEmailSimple = async (email, otp) => {
   try {
     const emailConfig = getEmailConfig();
